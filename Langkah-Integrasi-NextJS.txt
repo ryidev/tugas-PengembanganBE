@@ -1,0 +1,344 @@
+# Panduan Integrasi Next.js dengan REST API (JWT Authentication & CRUD)
+
+Dokumen ini menjelaskan langkah-langkah dari awal membuat proyek **Next.js** (App Router) hingga mengintegrasikannya dengan backend REST API yang menggunakan autentikasi JWT (seperti pada aplikasi Node.js/Express Anda di port 5001).
+
+---
+
+## 📌 Prasyarat (Prerequisites)
+Sebelum memulai, pastikan Anda telah menginstal:
+1. **Node.js** (versi 18.x atau yang lebih baru) & **npm** (atau yarn/pnpm).
+2. **Backend API** yang sudah berjalan di local environment Anda (misalnya di `http://localhost:5001`), dengan endpoint:
+   - `POST /api/auth/register` (Registrasi user)
+   - `POST /api/auth/login` (Login user, mengembalikan JWT token)
+   - `GET /api/data` (Mengambil data, terproteksi JWT)
+   - `POST /api/data` (Menambahkan data, terproteksi JWT)
+   - `PUT /api/data/:id` (Mengubah data berdasarkan ID, terproteksi JWT)
+   - `DELETE /api/data/:id` (Menghapus data berdasarkan ID, terproteksi JWT)
+
+---
+
+## 🚀 Langkah 1: Instalasi Proyek Next.js Baru
+
+Jalankan perintah berikut di terminal Anda untuk membuat proyek Next.js baru:
+
+```bash
+npx create-next-app@latest fe
+```
+
+Selama proses instalasi, Anda akan diberikan beberapa pertanyaan konfigurasi. Rekomendasi pilihan untuk proyek modern:
+
+*   **Would you like to use TypeScript?** `Yes` (Untuk keamanan tipe data/type safety)
+*   **Would you like to use ESLint?** `Yes` (Untuk linter kode)
+*   **Would you like to use Tailwind CSS?** `Yes` (Untuk kemudahan styling visual)
+*   **Would you like to use `src/` directory?** `Yes` (Memisahkan kode aplikasi dari file konfigurasi root)
+*   **Would you like to use App Router? (recommended)** `Yes` (Router berbasis folder modern dari Next.js)
+*   **Would you like to customize the default import alias (@/*)?** `No` (Menggunakan `@/` default untuk mempermudah path import)
+
+Setelah instalasi selesai, masuk ke direktori frontend:
+```bash
+cd fe
+```
+
+---
+
+## 📦 Langkah 2: Instalasi Dependensi Tambahan (Ikon & State)
+
+Untuk membuat antarmuka yang menarik dengan ikon modern, instal **Lucide React**:
+
+```bash
+npm install lucide-react
+```
+
+Jika Anda ingin menggunakan library HTTP client seperti Axios (opsional, karena kita juga bisa menggunakan native `fetch` bawaan browser), Anda bisa menginstalnya:
+```bash
+npm install axios
+```
+*(Dalam contoh di bawah, kita akan menggunakan native `fetch` karena performanya sudah sangat baik dan tidak menambah ukuran bundle aplikasi).*
+
+---
+
+## 🔑 Langkah 3: Konfigurasi Environment Variables
+
+Jangan pernah menulis langsung (hardcode) URL API backend Anda di dalam kode React. Buat file `.env.local` di folder root frontend (`fe/`):
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5001
+```
+
+> ⚠️ **Catatan Penting:** Prefix `NEXT_PUBLIC_` wajib digunakan agar variabel lingkungan tersebut dapat diakses oleh browser/sisi client di dalam Next.js.
+
+---
+
+## 🛠️ Langkah 4: Membuat Antarmuka & State Management di Client Component
+
+Pada Next.js App Router, secara default semua komponen adalah **Server Components**. Karena kita butuh interaksi user (input form, klik button, state, localstorage), kita harus mengubah halaman utama menjadi **Client Component**.
+
+Buka file `src/app/page.tsx` dan tambahkan directive `"use client";` di baris paling atas.
+
+Berikut adalah kerangka state yang dibutuhkan untuk integrasi JWT & CRUD:
+
+```tsx
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { Moon, Sun, RefreshCw, User, Lock, Mail, Plus, Trash2, Pencil, LogOut, AlertCircle, X } from 'lucide-react';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+
+export default function Home() {
+  // State Autentikasi & Sesi
+  const [token, setToken] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  
+  // State Form Autentikasi
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // State Data CRUD
+  const [dataList, setDataList] = useState<any[]>([]);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
+
+  // State Modals
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+
+  // ... (lanjut ke Langkah 5 untuk logic API)
+}
+```
+
+---
+
+## 🔄 Langkah 5: Mengintegrasikan API dengan State React
+
+### 1. Sinkronisasi Sesi Auth di Awal (`useEffect`)
+Ketika halaman pertama kali dimuat, periksa apakah token JWT sudah tersimpan di `localStorage` browser. Jika ada, simpan ke state dan langsung panggil data dari backend.
+
+```tsx
+useEffect(() => {
+  const savedToken = localStorage.getItem('token');
+  const savedUser = localStorage.getItem('username');
+  if (savedToken && savedUser) {
+    setToken(savedToken);
+    setCurrentUser(savedUser);
+    fetchData(savedToken); // Panggil fungsi fetch data
+  }
+}, []);
+```
+
+### 2. Fungsi Fetch Data (GET)
+Fungsi ini melakukan GET request ke `/api/data` dengan menyisipkan JWT token di header `Authorization`.
+
+```tsx
+const fetchData = async (authToken: string) => {
+  setDataLoading(true);
+  setDataError(null);
+  try {
+    const response = await fetch(`${API_URL}/api/data`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+    if (!response.ok) {
+      throw new Error('Gagal mengambil data dari server.');
+    }
+    const data = await response.json();
+    setDataList(data);
+  } catch (err: any) {
+    setDataError(err.message || 'Terjadi kesalahan koneksi.');
+  } finally {
+    setDataLoading(false);
+  }
+};
+```
+
+### 3. Registrasi & Login User (POST Auth)
+Fungsi dinamis untuk menangani Login dan Register berdasarkan state `authMode`:
+
+```tsx
+const handleAuthSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setAuthError(null);
+  setAuthLoading(true);
+
+  const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+  const body = authMode === 'login' 
+    ? { email, password } 
+    : { username, email, password };
+
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    const resData = await response.json();
+
+    if (!response.ok) {
+      throw new Error(resData.message || 'Autentikasi gagal.');
+    }
+
+    // Simpan token & nama pengguna ke LocalStorage & State
+    localStorage.setItem('token', resData.token);
+    localStorage.setItem('username', resData.username || resData.email);
+    setToken(resData.token);
+    setCurrentUser(resData.username || resData.email);
+    
+    // Reset Form Input
+    setEmail('');
+    setPassword('');
+    setUsername('');
+    
+    // Ambil data terbaru menggunakan token baru
+    fetchData(resData.token);
+  } catch (err: any) {
+    setAuthError(err.message || 'Koneksi gagal. Apakah backend Anda sudah berjalan?');
+  } finally {
+    setAuthLoading(false);
+  }
+};
+```
+
+### 4. Membuat Data Baru (POST)
+Mengirim data baru ke backend terproteksi. Data yang sukses dibuat langsung dimasukkan ke state `dataList` agar antarmuka terupdate seketika (tanpa reload halaman).
+
+```tsx
+const handleCreateData = async (title: string, description: string) => {
+  if (!token) return;
+  try {
+    const response = await fetch(`${API_URL}/api/data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ title, description })
+    });
+
+    const resData = await response.json();
+    if (!response.ok) throw new Error(resData.message || 'Gagal menambahkan data.');
+
+    // Tambahkan data baru ke daftar paling atas
+    setDataList([resData, ...dataList]);
+    setIsAddModalOpen(false);
+  } catch (err: any) {
+    alert(err.message);
+  }
+};
+```
+
+### 5. Mengubah Data (PUT)
+Mengirim perubahan data ke `/api/data/:id`. Setelah sukses, perbarui item yang bersangkutan di dalam array state `dataList`.
+
+```tsx
+const handleUpdateData = async (id: string, updatedTitle: string, updatedDescription: string) => {
+  if (!token) return;
+  try {
+    const response = await fetch(`${API_URL}/api/data/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ title: updatedTitle, description: updatedDescription })
+    });
+
+    const resData = await response.json();
+    if (!response.ok) throw new Error(resData.message || 'Gagal mengubah data.');
+
+    // Ganti data lama dengan data baru di state lokal
+    setDataList(dataList.map(item => item._id === id ? resData : item));
+    setIsEditModalOpen(false);
+    setEditingItem(null);
+  } catch (err: any) {
+    alert(err.message);
+  }
+};
+```
+
+### 6. Menghapus Data (DELETE)
+Mengirim request penghapusan ke `/api/data/:id`. Setelah sukses, hapus item tersebut dari array state lokal menggunakan `.filter()`.
+
+```tsx
+const handleDeleteData = async (id: string) => {
+  if (!token) return;
+  try {
+    const response = await fetch(`${API_URL}/api/data/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      const resData = await response.json();
+      throw new Error(resData.message || 'Gagal menghapus data.');
+    }
+
+    // Filter keluar data yang telah dihapus dari state lokal
+    setDataList(dataList.filter(item => item._id !== id));
+  } catch (err: any) {
+    alert(err.message);
+  }
+};
+```
+
+### 7. Logout User
+Mereset seluruh data auth dari state dan membersihkan `localStorage`.
+
+```tsx
+const handleLogout = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('username');
+  setToken(null);
+  setCurrentUser(null);
+  setDataList([]); // Kosongkan data agar aman
+};
+```
+
+---
+
+## ⚡ Langkah 6: Menjalankan Aplikasi & Pengujian
+
+1.  Pastikan Server Backend Anda berjalan di port `5001`.
+2.  Buka terminal baru di folder proyek frontend (`fe/`) Anda, lalu jalankan:
+    ```bash
+    npm run dev
+    ```
+3.  Aplikasi Next.js akan berjalan di `http://localhost:3000`.
+4.  Buka browser dan lakukan uji coba:
+    *   **Register** akun baru.
+    *   **Login** dengan akun tersebut.
+    *   Coba lakukan operasi **CRUD**: Add Data, View Data, Edit Data, dan Delete Data.
+    *   Lakukan **Logout** dan pastikan halaman kembali ke form login.
+
+---
+
+## 🚨 Troubleshooting & Tips Keamanan
+
+### 1. Masalah CORS (Cross-Origin Resource Sharing)
+Jika konsol browser Anda menampilkan error warna merah terkait **CORS**, artinya backend Anda belum mengizinkan request dari domain frontend Next.js (`http://localhost:3000`).
+
+**Solusi di Backend (Express):**
+Instal library `cors` di backend:
+```bash
+npm install cors
+```
+Lalu tambahkan middleware cors di server utama backend Anda (biasanya `server.js` atau `app.js`):
+```js
+import cors from 'cors';
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true
+}));
+```
+
+### 2. Keamanan Token
+*   Menyimpan token di `localStorage` sangat praktis untuk keperluan pengerjaan tugas atau prototipe.
+*   Untuk proyek skala produksi, disarankan menggunakan **HttpOnly Cookies** agar token JWT aman dari serangan Cross-Site Scripting (XSS).

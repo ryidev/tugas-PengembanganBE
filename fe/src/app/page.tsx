@@ -19,6 +19,8 @@ import {
   EyeOff
 } from 'lucide-react';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
+
 export default function BackendIntegration() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -74,7 +76,7 @@ export default function BackendIntegration() {
     setDataLoading(true);
     setDataError(null);
     try {
-      const response = await fetch('http://localhost:5001/api/data', {
+      const response = await fetch(`${API_URL}/api/data`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -98,8 +100,8 @@ export default function BackendIntegration() {
     setAuthLoading(true);
 
     const url = authMode === 'login' 
-      ? 'http://localhost:5001/api/auth/login' 
-      : 'http://localhost:5001/api/auth/register';
+      ? `${API_URL}/api/auth/login` 
+      : `${API_URL}/api/auth/register`;
 
     const body = authMode === 'login'
       ? { email, password }
@@ -148,7 +150,7 @@ export default function BackendIntegration() {
     setDataError(null);
 
     try {
-      const response = await fetch('http://localhost:5001/api/data', {
+      const response = await fetch(`${API_URL}/api/data`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -185,7 +187,7 @@ export default function BackendIntegration() {
     setDataError(null);
 
     try {
-      const response = await fetch(`http://localhost:5001/api/data/${editingItem._id}`, {
+      const response = await fetch(`${API_URL}/api/data/${editingItem._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -224,7 +226,7 @@ export default function BackendIntegration() {
     setDataError(null);
 
     try {
-      const response = await fetch(`http://localhost:5001/api/data/${id}`, {
+      const response = await fetch(`${API_URL}/api/data/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

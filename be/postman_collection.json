@@ -24,12 +24,12 @@
               "raw": "{\n  \"username\": \"johndoe\",\n  \"email\": \"johndoe@example.com\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
-              "raw": "http://localhost:5000/api/auth/register",
+              "raw": "http://localhost:5001/api/auth/register",
               "protocol": "http",
               "host": [
                 "localhost"
               ],
-              "port": "5000",
+              "port": "5001",
               "path": [
                 "api",
                 "auth",
@@ -55,12 +55,12 @@
               "raw": "{\n  \"email\": \"johndoe@example.com\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
-              "raw": "http://localhost:5000/api/auth/login",
+              "raw": "http://localhost:5001/api/auth/login",
               "protocol": "http",
               "host": [
                 "localhost"
               ],
-              "port": "5000",
+              "port": "5001",
               "path": [
                 "api",
                 "auth",
@@ -91,12 +91,12 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "http://localhost:5000/api/data",
+              "raw": "http://localhost:5001/api/data",
               "protocol": "http",
               "host": [
                 "localhost"
               ],
-              "port": "5000",
+              "port": "5001",
               "path": [
                 "api",
                 "data"
@@ -131,15 +131,87 @@
               "raw": "{\n  \"title\": \"My First Task\",\n  \"description\": \"This is the description for my first data entry.\"\n}"
             },
             "url": {
-              "raw": "http://localhost:5000/api/data",
+              "raw": "http://localhost:5001/api/data",
               "protocol": "http",
               "host": [
                 "localhost"
               ],
-              "port": "5000",
+              "port": "5001",
               "path": [
                 "api",
                 "data"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Data",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Task Title\",\n  \"description\": \"This is the updated description for my data entry.\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:5001/api/data/PASTE_ID_HERE",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "5001",
+              "path": [
+                "api",
+                "data",
+                "PASTE_ID_HERE"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Data",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:5001/api/data/PASTE_ID_HERE",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "5001",
+              "path": [
+                "api",
+                "data",
+                "PASTE_ID_HERE"
               ]
             }
           },
